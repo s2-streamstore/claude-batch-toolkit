@@ -98,8 +98,10 @@ def atomic_write_json(path: Path, obj: Any) -> None:
     # best-effort fsync
     try:
         fd = os.open(tmp, os.O_RDONLY)
-        os.fsync(fd)
-        os.close(fd)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
     except Exception:
         pass
     tmp.replace(path)
