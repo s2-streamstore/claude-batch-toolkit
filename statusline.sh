@@ -230,6 +230,22 @@ touch "$POLL_CACHE"
         source "$ENV_FILE"
     fi
 
+    # Try .env files
+    if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
+        for dotenv in "$HOME/.claude/.env" "$BATCHES_DIR/.env"; do
+            if [[ -f "$dotenv" ]]; then
+                val="$(grep -m1 '^\(export[[:space:]]*\)\?ANTHROPIC_API_KEY=' "$dotenv" 2>/dev/null \
+                       | sed 's/^\(export[[:space:]]*\)\?ANTHROPIC_API_KEY=//' \
+                       | sed "s/^'//;s/'$//" \
+                       | sed 's/^"//;s/"$//' )" || true
+                if [[ -n "$val" ]]; then
+                    ANTHROPIC_API_KEY="$val"
+                    break
+                fi
+            fi
+        done
+    fi
+
     if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
         exit 0
     fi

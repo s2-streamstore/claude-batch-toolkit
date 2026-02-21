@@ -64,9 +64,25 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# ─── Determine script directory (where source files are) ───────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # ─── Resolve API key (without sourcing arbitrary files) ─────────────────────────
 if [[ -z "$API_KEY" ]]; then
     API_KEY="${ANTHROPIC_API_KEY:-}"
+fi
+
+# Try .env file in script directory / current directory
+if [[ -z "$API_KEY" ]]; then
+    for dotenv in "$SCRIPT_DIR/.env" ".env"; do
+        if [[ -f "$dotenv" ]]; then
+            API_KEY="$(grep -m1 '^\(export[[:space:]]*\)\?ANTHROPIC_API_KEY=' "$dotenv" 2>/dev/null \
+                       | sed 's/^\(export[[:space:]]*\)\?ANTHROPIC_API_KEY=//' \
+                       | sed "s/^'//;s/'$//" \
+                       | sed 's/^"//;s/"$//' )" || true
+            [[ -n "$API_KEY" ]] && break
+        fi
+    done
 fi
 
 if [[ -z "$API_KEY" ]]; then
@@ -89,9 +105,6 @@ if [[ -z "$API_KEY" ]]; then
     [[ -n "$API_KEY" ]] || die "No API key provided."
 fi
 
-# ─── Determine script directory (where source files are) ───────────────────────
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
 # ─── Pre-flight checks ─────────────────────────────────────────────────────────
 echo ""
 echo -e "${BOLD}claude-batch-toolkit installer${NC}"
@@ -106,15 +119,78 @@ command -v curl &>/dev/null || MISSING_DEPS+=("curl")
 if [[ ${#MISSING_DEPS[@]} -gt 0 ]]; then
     err "Missing required dependencies: ${MISSING_DEPS[*]}"
     echo ""
-    echo "Install them first:"
-    for dep in "${MISSING_DEPS[@]}"; do
-        case "$dep" in
-            uv)   echo "  curl -LsSf https://astral.sh/uv/install.sh | sh" ;;
-            jq)   echo "  brew install jq  # or: apt-get install jq" ;;
-            curl)  echo "  brew install curl # or: apt-get install curl" ;;
-        esac
-    done
-    exit 1
+
+    if [[ "$UNATTENDED" -eq 1 ]]; then
+        echo "Install them first:"
+        for dep in "${MISSING_DEPS[@]}"; do
+            case "$dep" in
+                uv)   echo "  curl -LsSf https://astral.sh/uv/install.sh | sh" ;;
+                jq)   echo "  brew install jq  # or: apt-get install jq" ;;
+                curl)  echo "  brew install curl # or: apt-get install curl" ;;
+            esac
+        done
+        exit 1
+    fi
+
+    echo -e -n "${BOLD}Would you like to install missing dependencies? [Y/n]${NC} "
+    read -r DEP_CONFIRM
+    case "${DEP_CONFIRM:-Y}" in
+        [Yy]|[Yy]es|"")
+            for dep in "${MISSING_DEPS[@]}"; do
+                case "$dep" in
+                    uv)
+                        info "Installing uv..."
+                        curl -LsSf https://astral.sh/uv/install.sh | sh || die "Failed to install uv"
+                        export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+                        command -v uv &>/dev/null || die "uv installed but not found in PATH. Restart your terminal and try again."
+                        ok "uv installed"
+                        ;;
+                    jq)
+                        info "Installing jq..."
+                        if command -v brew &>/dev/null; then
+                            brew install jq || die "Failed to install jq"
+                        elif command -v apt-get &>/dev/null; then
+                            sudo apt-get install -y jq || die "Failed to install jq"
+                        elif command -v dnf &>/dev/null; then
+                            sudo dnf install -y jq || die "Failed to install jq"
+                        elif command -v pacman &>/dev/null; then
+                            sudo pacman -S --noconfirm jq || die "Failed to install jq"
+                        else
+                            die "Cannot auto-install jq. Please install it manually."
+                        fi
+                        ok "jq installed"
+                        ;;
+                    curl)
+                        info "Installing curl..."
+                        if command -v brew &>/dev/null; then
+                            brew install curl || die "Failed to install curl"
+                        elif command -v apt-get &>/dev/null; then
+                            sudo apt-get install -y curl || die "Failed to install curl"
+                        elif command -v dnf &>/dev/null; then
+                            sudo dnf install -y curl || die "Failed to install curl"
+                        elif command -v pacman &>/dev/null; then
+                            sudo pacman -S --noconfirm curl || die "Failed to install curl"
+                        else
+                            die "Cannot auto-install curl. Please install it manually."
+                        fi
+                        ok "curl installed"
+                        ;;
+                esac
+            done
+            ;;
+        *)
+            echo ""
+            echo "Install them first:"
+            for dep in "${MISSING_DEPS[@]}"; do
+                case "$dep" in
+                    uv)   echo "  curl -LsSf https://astral.sh/uv/install.sh | sh" ;;
+                    jq)   echo "  brew install jq  # or: apt-get install jq" ;;
+                    curl)  echo "  brew install curl # or: apt-get install curl" ;;
+                esac
+            done
+            exit 1
+            ;;
+    esac
 fi
 
 ok "Dependencies found: uv, jq, curl"

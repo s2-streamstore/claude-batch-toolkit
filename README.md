@@ -12,15 +12,25 @@ cd claude-batch-toolkit
 ./install.sh --api-key sk-ant-your-key-here
 ```
 
-The installer shows a manifest of every change it will make and asks for confirmation before proceeding.
+**Windows (PowerShell):**
+
+```powershell
+git clone git@github.com:s2-streamstore/claude-batch-toolkit.git
+cd claude-batch-toolkit
+.\install.ps1 -ApiKey sk-ant-your-key-here
+```
+
+> If you get a script execution error, run: `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned`
+
+The installer shows a manifest of every change it will make and asks for confirmation before proceeding. You can also create a `.env` file with your API key instead of passing it on the command line (see `.env.example`).
 
 ### Install Options
 
-| Flag | Description |
-|------|-------------|
-| `--api-key KEY` | Your Anthropic API key (required unless already in env) |
-| `--no-poller` | Skip status line configuration |
-| `--unattended` | No interactive prompts |
+| Bash Flag | PowerShell Flag | Description |
+|-----------|----------------|-------------|
+| `--api-key KEY` | `-ApiKey KEY` | Your Anthropic API key (required unless already in env or `.env`) |
+| `--no-poller` | `-NoPoller` | Skip status line configuration |
+| `--unattended` | `-Unattended` | No interactive prompts |
 
 ### Uninstall
 
@@ -28,7 +38,13 @@ The installer shows a manifest of every change it will make and asks for confirm
 ./uninstall.sh
 ```
 
-This shows what will be removed, asks for confirmation, and preserves your results in `~/.claude/batches/results/`. Use `--purge-data` to also remove results.
+**Windows:**
+
+```powershell
+.\uninstall.ps1
+```
+
+This shows what will be removed, asks for confirmation, and preserves your results in `~/.claude/batches/results/`. Use `--purge-data` / `-PurgeData` to also remove results.
 
 <details>
 <summary><strong>Manual Installation (no script)</strong></summary>
@@ -458,7 +474,8 @@ For more details, see the [Vertex AI Claude batch documentation](https://docs.cl
 ├── skills/
 │   └── batch/
 │       └── SKILL.md             # Skill definition
-├── statusline.sh                # Status bar + cached poller
+├── statusline.sh                # Status bar + cached poller (macOS/Linux)
+├── statusline.ps1               # Status bar + cached poller (Windows)
 └── batches/
     ├── jobs.json                # Job registry
     ├── .poll_cache              # Last poll timestamp
@@ -542,11 +559,43 @@ gcloud ai batch-prediction-jobs list --project=$VERTEX_PROJECT --region=$VERTEX_
 chmod 600 ~/.claude/env
 ```
 
+### Windows: "execution of scripts is disabled"
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+```
+
+### Windows: "MCP server not responding"
+
+```powershell
+# Test the MCP server directly
+uv run $HOME\.claude\mcp\claude_batch_mcp.py list
+
+# Check if uv is installed
+Get-Command uv
+
+# Verify API key
+Get-Content $HOME\.claude\env | Select-String ANTHROPIC_API_KEY
+```
+
+### Windows: "No batch info in status bar"
+
+```powershell
+# Check statusline config
+Get-Content $HOME\.claude\settings.json | ConvertFrom-Json | Select-Object -ExpandProperty statusLine
+
+# Test statusline manually
+echo '{}' | powershell -NoProfile -ExecutionPolicy Bypass -File $HOME\.claude\statusline.ps1
+
+# Check jobs.json exists
+Get-Content $HOME\.claude\batches\jobs.json
+```
+
 ## Architecture
 
 - **MCP Server** (`claude_batch_mcp.py`): Python script run by `uv`. Exposes `send_to_batch`, `batch_status`, `batch_fetch`, `batch_list`, `batch_poll_once` tools. Also works as a CLI.
 - **Skill** (`SKILL.md`): Teaches Claude Code how and when to use the batch tools. Loaded automatically.
-- **Status Line** (`statusline.sh`): Bash script that renders batch job counts in the Claude Code status bar and triggers background polling via `curl`+`jq`.
+- **Status Line** (`statusline.sh` / `statusline.ps1`): Renders batch job counts in the Claude Code status bar and triggers background polling. The bash version uses `curl`+`jq`; the PowerShell version uses `Invoke-RestMethod` with native JSON.
 - **Jobs Registry** (`jobs.json`): JSON file tracking all submitted batch jobs, their states, and result paths.
 
 ## License
