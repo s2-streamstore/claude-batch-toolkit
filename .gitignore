@@ -1,0 +1,33 @@
+# Environment files (contain secrets)
+.env
+
+# Claude Code local settings
+.claude/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+.eggs/
+.venv/
+venv/
+*.pyc
+
+# Editors and IDEs
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.sublime-*
+
+# OS generated
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Installer backup files
+*.bak
