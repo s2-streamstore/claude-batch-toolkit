@@ -28,7 +28,8 @@ C_BOLD='\033[1m'
 # Claude Code pipes a JSON object with model info, context %, cost.
 # We read it all at once to avoid blocking.
 INPUT=""
-if ! read -t 1 -r INPUT; then
+INPUT=$(cat 2>/dev/null) || INPUT="{}"
+if [[ -z "$INPUT" ]]; then
     INPUT="{}"
 fi
 
@@ -36,12 +37,10 @@ fi
 # Safely extract fields; default to empty/zero if missing
 MODEL=""
 CONTEXT_PCT=""
-COST=""
 
 if command -v jq &>/dev/null && [[ -n "$INPUT" ]]; then
-    MODEL=$(echo "$INPUT" | jq -r '.model // empty' 2>/dev/null) || MODEL=""
-    CONTEXT_PCT=$(echo "$INPUT" | jq -r '.contextPercent // empty' 2>/dev/null) || CONTEXT_PCT=""
-    COST=$(echo "$INPUT" | jq -r '.cost // empty' 2>/dev/null) || COST=""
+    MODEL=$(echo "$INPUT" | jq -r '.model.display_name // empty' 2>/dev/null) || MODEL=""
+    CONTEXT_PCT=$(echo "$INPUT" | jq -r '.context_window.used_percentage // empty' 2>/dev/null) || CONTEXT_PCT=""
 fi
 
 # ─── Format model name (shorten) ───────────────────────────────────────────────
@@ -104,11 +103,6 @@ if [[ -n "$CONTEXT_PCT" ]]; then
     else
         STATUS_PARTS+=("${CTX_INT}%")
     fi
-fi
-
-# Cost
-if [[ -n "$COST" ]]; then
-    STATUS_PARTS+=("\$${COST}")
 fi
 
 # Batch section
